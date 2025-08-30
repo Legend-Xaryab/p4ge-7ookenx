@@ -3,7 +3,8 @@
 <h1 class="text-2xl font-bold text-center mb-4">Extract Page Tokens</h1>
 
 <form method="post" class="flex flex-col gap-4">
-  <input type="text" name="token" placeholder="Enter Facebook User Access Token" class="border p-2 rounded-lg" required>
+  <input type="text" name="token" placeholder="Enter Facebook User Access Token" 
+         class="border p-2 rounded-lg" required>
   <button type="submit" class="bg-purple-600 text-white p-2 rounded-lg hover:scale-105 transition">Extract</button>
 </form>
 
@@ -20,9 +21,22 @@
       <li class="p-3 border rounded-lg bg-gray-50">
         <strong>{{ page.name }}</strong><br>
         Page ID: {{ page.id }}<br>
-        Page Token: <code>{{ page.access_token }}</code>
+        Page Token: 
+        <code id="token-{{ loop.index }}">{{ page.access_token }}</code>
+        <button type="button" 
+                onclick="copyToken('token-{{ loop.index }}')" 
+                class="ml-2 bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">Copy</button>
       </li>
     {% endfor %}
   </ul>
 {% endif %}
+
+<script>
+function copyToken(id) {
+  const text = document.getElementById(id).innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    alert("Copied: " + text.substring(0,30) + "...");
+  });
+}
+</script>
 {% endblock %}
