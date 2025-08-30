@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{{ title or "Facebook Tool" }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/framer-motion@10.16.5/dist/framer-motion.umd.js"></script>
+  <style>
+    body {
+      background: linear-gradient(-45deg, #1e3a8a, #3b82f6, #9333ea, #ec4899);
+      background-size: 400% 400%;
+      animation: gradient 15s ease infinite;
+    }
+    @keyframes gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+  <div class="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-lg animate-fadeIn">
+    {% block content %}{% endblock %}
+  </div>
+
+  <script>
+    // Simple fade-in animation
+    document.querySelectorAll(".animate-fadeIn").forEach(el => {
+      el.style.opacity = 0;
+      setTimeout(() => {
+        el.style.transition = "opacity 1s ease-in-out";
+        el.style.opacity = 1;
+      }, 200);
+    });
+  </script>
+</body>
+</html>
