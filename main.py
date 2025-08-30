@@ -1,32 +1,23 @@
 from flask import Flask, request, render_template, redirect, url_for, session
 import requests
-from threading import Thread, Event
-import time
 import os
+import threading
+import time
 
 app = Flask(__name__)
-app.secret_key = "super-secret-key"  # 🔒 change for production
+app.secret_key = os.environ.get("SECRET_KEY", "supersecret")
 
-FB_GRAPH_URL = "https://graph.facebook.com/v19.0"
+# Login credentials (set them in Render environment variables)
+USERNAME = os.environ.get("APP_USERNAME", "admin")
+PASSWORD = os.environ.get("APP_PASSWORD", "password")
 
-# Credentials (better: use env vars on Render)
-USERNAME = os.getenv("USERNAME", "admin")
-PASSWORD = os.getenv("PASSWORD", "password123")
-
-# === Self-ping setup ===
-stop_event = Event()
-
-def self_ping():
-    """Ping the app every 5 minutes to keep it awake on Render."""
-    while not stop_event.is_set():
-        try:
-            url = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:5000")
-            requests.get(url)
-        except Exception as e:
-            print(f"Self-ping failed: {e}")
-        time.sleep(300)
+# Facebook Graph API Base URL
+FB_GRAPH_URL = "https://graph.facebook.com/v20.0"
 
 
+# -----------------------------
+# Routes
+# -----------------------------
 @app.route("/", methods=["GET", "POST"])
 def login():
     """Login page"""
@@ -38,14 +29,14 @@ def login():
             session["logged_in"] = True
             return redirect(url_for("dashboard"))
         else:
-            return render_template("login.html", error="Invalid username or password")
+            return render_template("login.html", error="Invalid credentials")
 
     return render_template("login.html")
 
 
 @app.route("/dashboard")
 def dashboard():
-    """Menu after login"""
+    """Dashboard after login"""
     if not session.get("logged_in"):
         return redirect(url_for("login"))
     return render_template("dashboard.html")
@@ -53,24 +44,39 @@ def dashboard():
 
 @app.route("/check", methods=["GET", "POST"])
 def check_token():
-    """Check if a token is valid"""
+    """Check if one or more tokens are valid"""
     if not session.get("logged_in"):
         return redirect(url_for("login"))
 
-    result = None
+    results = []
     if request.method == "POST":
-        token = request.form.get("token")
-        url = f"{FB_GRAPH_URL}/me"
-        params = {"access_token": token}
-        response = requests.get(url, params=params)
+        tokens_input = request.form.get("tokens")
+        tokens = [t.strip() for t in tokens_input.splitlines() if t.strip()]
 
-        if response.status_code == 200:
-            user = response.json()
-            result = f"✅ Valid token! User: {user.get('name')} (ID: {user.get('id')})"
-        else:
-            result = f"❌ Invalid token. Error: {response.json()}"
+        for token in tokens:
+            url = f"{FB_GRAPH_URL}/me"
+            params = {"access_token": token}
+            response = requests.get(url, params=params)
 
-    return render_template("check.html", result=result)
+            if response.status_code == 200:
+                user = response.json()
+                results.append({
+                    "token": token,
+                    "status": "valid",
+                    "user": f"{user.get('name')} (ID: {user.get('id')})"
+                })
+            else:
+                try:
+                    err = response.json()
+                except:
+                    err = {"error": "Unknown error"}
+                results.append({
+                    "token": token,
+                    "status": "invalid",
+                    "error": err
+                })
+
+    return render_template("check.html", results=results)
 
 
 @app.route("/extract", methods=["GET", "POST"])
@@ -104,15 +110,33 @@ def extract_pages():
 
 @app.route("/logout")
 def logout():
-    """Logout user"""
-    session.pop("logged_in", None)
+    """Logout and clear session"""
+    session.clear()
     return redirect(url_for("login"))
 
 
+# -----------------------------
+# Keep Alive Feature
+# -----------------------------
+def keep_alive():
+    """Prevent Render app from sleeping"""
+    while True:
+        try:
+            url = os.environ.get("RENDER_EXTERNAL_URL")
+            if url:
+                requests.get(url)
+        except Exception as e:
+            print("Keep alive error:", e)
+        time.sleep(600)  # every 10 minutes
+
+
+# Start keep_alive thread
+threading.Thread(target=keep_alive, daemon=True).start()
+
+
+# -----------------------------
+# Run App
+# -----------------------------
 if __name__ == "__main__":
-    t = Thread(target=self_ping, daemon=True)
-    t.start()
-    try:
-        app.run(host="0.0.0.0", port=5000)
-    finally:
-        stop_event.set()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
