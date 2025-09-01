@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Refresh Token</title>
+</head>
+<body>
+  <h2>Refresh Token</h2>
+  <form method="post">
+    <textarea name="token" rows="3" cols="60" placeholder="Paste your token here"></textarea><br>
+    <button type="submit">Refresh</button>
+  </form>
+
+  {% if error %}
+    <p style="color:red">{{ error }}</p>
+  {% endif %}
+
+  {% if details %}
+    <h3>Token Info</h3>
+    <ul>
+      <li><b>App ID:</b> {{ details.app_id }}</li>
+      <li><b>User ID:</b> {{ details.user_id }}</li>
+      <li><b>Valid:</b> {{ details.is_valid }}</li>
+      <li><b>Expires At:</b> {{ details.expires_at }}</li>
+      <li><b>Scopes:</b> {{ details.scopes }}</li>
+    </ul>
+  {% endif %}
+
+  <p><a href="{{ url_for('tools') }}">⬅ Back to Tools</a></p>
+</body>
+</html>
