@@ -3,7 +3,6 @@ import requests
 import os
 import threading
 import time
-from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "supersecret")
@@ -109,46 +108,52 @@ def extract_pages():
     return render_template("extract.html", pages=pages, error=error)
 
 
-@app.route("/details", methods=["GET", "POST"])
-def token_details():
-    """Get full details of a token: UID, name, expiry"""
+@app.route("/refresh", methods=["GET", "POST"])
+def refresh_token():
+    """Refresh a token and show expiry"""
     if not session.get("logged_in"):
         return redirect(url_for("login"))
 
-    details = None
-    error = None
+    result = None
     if request.method == "POST":
         token = request.form.get("token")
 
-        # Get user info
-        url = f"{FB_GRAPH_URL}/me"
-        params = {"access_token": token, "fields": "id,name"}
-        user_resp = requests.get(url, params=params)
+        try:
+            # Step 1: Get user info
+            user_url = f"{FB_GRAPH_URL}/me"
+            user_params = {"access_token": token, "fields": "id,name"}
+            user_resp = requests.get(user_url, params=user_params)
 
-        # Debug token info
-        debug_url = f"{FB_GRAPH_URL}/debug_token"
-        debug_params = {"input_token": token, "access_token": token}
-        debug_resp = requests.get(debug_url, params=debug_params)
+            if user_resp.status_code != 200:
+                result = {"error": user_resp.json().get("error", "Invalid token")}
+            else:
+                user_data = user_resp.json()
 
-        if user_resp.status_code == 200 and debug_resp.status_code == 200:
-            user = user_resp.json()
-            debug = debug_resp.json().get("data", {})
+                # Step 2: Debug token for expiry info
+                debug_url = f"{FB_GRAPH_URL}/debug_token"
+                debug_params = {
+                    "input_token": token,
+                    "access_token": token  # using same token for self-check
+                }
+                debug_resp = requests.get(debug_url, params=debug_params)
 
-            expiry = debug.get("expires_at")
-            expiry_str = "Never" if not expiry else datetime.utcfromtimestamp(expiry).strftime("%Y-%m-%d %H:%M:%S UTC")
+                if debug_resp.status_code != 200:
+                    result = {"error": debug_resp.json().get("error", "Could not debug token")}
+                else:
+                    debug_data = debug_resp.json().get("data", {})
+                    expiry = debug_data.get("expires_at", "Unknown")
 
-            details = {
-                "id": user.get("id"),
-                "name": user.get("name"),
-                "token": token,
-                "expires_at": expiry_str,
-                "is_valid": debug.get("is_valid"),
-                "scopes": debug.get("scopes", [])
-            }
-        else:
-            error = f"Error: {user_resp.text} {debug_resp.text}"
+                    result = {
+                        "id": user_data.get("id"),
+                        "name": user_data.get("name"),
+                        "new_token": token,  # in real flow you'd exchange token
+                        "expiry": expiry
+                    }
 
-    return render_template("details.html", details=details, error=error)
+        except Exception as e:
+            result = {"error": str(e)}
+
+    return render_template("refresh.html", result=result)
 
 
 @app.route("/logout")
