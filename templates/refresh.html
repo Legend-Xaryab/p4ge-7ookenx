@@ -1,29 +1,40 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Refresh Token</title>
-</head>
-<body>
-    <h2>♻️ Refresh Token</h2>
-    <form method="POST">
-        <label for="token">Enter Token:</label><br>
-        <textarea name="token" rows="4" cols="50" required></textarea><br><br>
-        <button type="submit">Refresh</button>
-    </form>
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold text-center mb-6">🔄 Refresh / Debug Token</h1>
 
-    {% if result %}
-        {% if result.error %}
-            <p style="color: red;">❌ Error: {{ result.error }}</p>
-        {% else %}
-            <h3>✅ Token Refreshed Successfully!</h3>
-            <p><strong>User:</strong> {{ result.name }} (ID: {{ result.id }})</p>
-            <p><strong>New Token:</strong> {{ result.new_token }}</p>
-            <p><strong>Expires At:</strong> {{ result.expiry }}</p>
-        {% endif %}
+<form method="POST" class="flex flex-col gap-4 max-w-md mx-auto">
+  <input type="text" name="token" placeholder="Enter your token" 
+         class="border p-2 rounded-lg w-full" required />
+  <button type="submit" 
+          class="bg-blue-600 text-white p-2 rounded-lg hover:scale-105 transition">
+    Refresh / Debug
+  </button>
+</form>
+
+{% if result %}
+  <div class="mt-6 bg-gray-100 p-4 rounded-lg shadow">
+    {% if result.mode == "refresh" %}
+      <h2 class="text-lg font-semibold mb-2">✅ Token Refreshed</h2>
+      <p><strong>New Access Token:</strong></p>
+      <textarea readonly class="w-full h-24 border p-2 rounded">{{ result.data.access_token }}</textarea>
+      <p class="mt-2"><strong>Token Type:</strong> {{ result.data.token_type }}</p>
+      <p><strong>Expires In:</strong> {{ result.data.expires_in }} seconds</p>
+    {% elif result.mode == "debug" %}
+      <h2 class="text-lg font-semibold mb-2">ℹ️ Token Debug Info</h2>
+      <p><strong>User ID:</strong> {{ result.data.data.user_id }}</p>
+      <p><strong>App ID:</strong> {{ result.data.data.app_id }}</p>
+      <p><strong>Type:</strong> {{ result.data.data.type }}</p>
+      <p><strong>Expires At:</strong> {{ result.data.data.expires_at }}</p>
+      <p><strong>Valid:</strong> {{ result.data.data.is_valid }}</p>
+    {% elif result.error %}
+      <h2 class="text-lg font-semibold text-red-600">❌ Error</h2>
+      <pre>{{ result.error }}</pre>
     {% endif %}
+  </div>
+{% endif %}
 
-    <p><a href="{{ url_for('dashboard') }}">⬅ Back to Dashboard</a></p>
-</body>
-</html>
+<p class="mt-6 text-center">
+  <a href="{{ url_for('dashboard') }}" 
+     class="text-blue-600 hover:underline">⬅ Back to Dashboard</a>
+</p>
+{% endblock %}
