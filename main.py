@@ -110,7 +110,7 @@ def extract_pages():
 
 @app.route("/refresh", methods=["GET", "POST"])
 def refresh_token():
-    """Refresh a token and show expiry"""
+    """Refresh or debug a token"""
     if not session.get("logged_in"):
         return redirect(url_for("login"))
 
@@ -125,7 +125,7 @@ def refresh_token():
             user_resp = requests.get(user_url, params=user_params)
 
             if user_resp.status_code != 200:
-                result = {"error": user_resp.json().get("error", "Invalid token")}
+                result = {"mode": "error", "error": user_resp.json().get("error", "Invalid token")}
             else:
                 user_data = user_resp.json()
 
@@ -138,20 +138,18 @@ def refresh_token():
                 debug_resp = requests.get(debug_url, params=debug_params)
 
                 if debug_resp.status_code != 200:
-                    result = {"error": debug_resp.json().get("error", "Could not debug token")}
+                    result = {"mode": "error", "error": debug_resp.json().get("error", "Could not debug token")}
                 else:
-                    debug_data = debug_resp.json().get("data", {})
-                    expiry = debug_data.get("expires_at", "Unknown")
+                    debug_data = debug_resp.json()
 
                     result = {
-                        "id": user_data.get("id"),
-                        "name": user_data.get("name"),
-                        "new_token": token,  # in real flow you'd exchange token
-                        "expiry": expiry
+                        "mode": "debug",
+                        "data": debug_data,
+                        "user": user_data
                     }
 
         except Exception as e:
-            result = {"error": str(e)}
+            result = {"mode": "error", "error": str(e)}
 
     return render_template("refresh.html", result=result)
 
