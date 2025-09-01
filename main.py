@@ -7,7 +7,7 @@ import time
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "supersecret")
 
-# Login credentials (set them in Render environment variables)
+# Login credentials (set them in Render environment variables if you want)
 USERNAME = os.environ.get("APP_USERNAME", "admin")
 PASSWORD = os.environ.get("APP_PASSWORD", "password")
 
@@ -110,7 +110,7 @@ def extract_pages():
 
 @app.route("/refresh", methods=["GET", "POST"])
 def refresh_token():
-    """Refresh or debug a token"""
+    """Refresh a token and show expiry with details"""
     if not session.get("logged_in"):
         return redirect(url_for("login"))
 
@@ -119,37 +119,46 @@ def refresh_token():
         token = request.form.get("token")
 
         try:
-            # Step 1: Get user info
+            # Step 1: Get user/page info
             user_url = f"{FB_GRAPH_URL}/me"
             user_params = {"access_token": token, "fields": "id,name"}
             user_resp = requests.get(user_url, params=user_params)
 
             if user_resp.status_code != 200:
-                result = {"mode": "error", "error": user_resp.json().get("error", "Invalid token")}
+                result = {"error": user_resp.json().get("error", "Invalid token")}
             else:
                 user_data = user_resp.json()
 
-                # Step 2: Debug token for expiry info
+                # 🔑 Hardcode your App ID and App Secret here
+                APP_ID = "YOUR_APP_ID"
+                APP_SECRET = "YOUR_APP_SECRET"
+                app_access_token = f"{APP_ID}|{APP_SECRET}"
+
+                # Step 2: Debug token with app access token
                 debug_url = f"{FB_GRAPH_URL}/debug_token"
                 debug_params = {
                     "input_token": token,
-                    "access_token": token  # using same token for self-check
+                    "access_token": app_access_token
                 }
                 debug_resp = requests.get(debug_url, params=debug_params)
 
                 if debug_resp.status_code != 200:
-                    result = {"mode": "error", "error": debug_resp.json().get("error", "Could not debug token")}
+                    result = {"error": debug_resp.json().get("error", "Could not debug token")}
                 else:
-                    debug_data = debug_resp.json()
+                    debug_data = debug_resp.json().get("data", {})
+                    expiry = debug_data.get("expires_at", "Unknown")
+                    token_type = debug_data.get("type", "Unknown")
 
                     result = {
-                        "mode": "debug",
-                        "data": debug_data,
-                        "user": user_data
+                        "id": user_data.get("id"),
+                        "name": user_data.get("name"),
+                        "token_type": token_type,
+                        "new_token": token,
+                        "expiry": expiry
                     }
 
         except Exception as e:
-            result = {"mode": "error", "error": str(e)}
+            result = {"error": str(e)}
 
     return render_template("refresh.html", result=result)
 
