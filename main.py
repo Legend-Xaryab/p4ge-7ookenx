@@ -7,12 +7,16 @@ import time
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "supersecret")
 
-# Login credentials (set them in Render environment variables if you want)
+# Login credentials (set them in Render environment variables)
 USERNAME = os.environ.get("APP_USERNAME", "admin")
 PASSWORD = os.environ.get("APP_PASSWORD", "password")
 
 # Facebook Graph API Base URL
 FB_GRAPH_URL = "https://graph.facebook.com/v20.0"
+
+# Facebook App credentials (HIDDEN in environment variables)
+APP_ID = os.environ.get("FB_APP_ID")
+APP_SECRET = os.environ.get("FB_APP_SECRET")
 
 
 # -----------------------------
@@ -110,7 +114,7 @@ def extract_pages():
 
 @app.route("/refresh", methods=["GET", "POST"])
 def refresh_token():
-    """Refresh a token and show expiry with details"""
+    """Refresh a token securely using App ID + App Secret"""
     if not session.get("logged_in"):
         return redirect(url_for("login"))
 
@@ -119,7 +123,7 @@ def refresh_token():
         token = request.form.get("token")
 
         try:
-            # Step 1: Get user/page info
+            # Step 1: Get user info
             user_url = f"{FB_GRAPH_URL}/me"
             user_params = {"access_token": token, "fields": "id,name"}
             user_resp = requests.get(user_url, params=user_params)
@@ -129,31 +133,39 @@ def refresh_token():
             else:
                 user_data = user_resp.json()
 
-                # 🔑 Hardcode your App ID and App Secret here
-                APP_ID = "YOUR_APP_ID"
-                APP_SECRET = "YOUR_APP_SECRET"
-                app_access_token = f"{APP_ID}|{APP_SECRET}"
-
-                # Step 2: Debug token with app access token
-                debug_url = f"{FB_GRAPH_URL}/debug_token"
-                debug_params = {
-                    "input_token": token,
-                    "access_token": app_access_token
+                # Step 2: Exchange short-lived token for long-lived token
+                exchange_url = f"{FB_GRAPH_URL}/oauth/access_token"
+                exchange_params = {
+                    "grant_type": "fb_exchange_token",
+                    "client_id": APP_ID,
+                    "client_secret": APP_SECRET,
+                    "fb_exchange_token": token
                 }
-                debug_resp = requests.get(debug_url, params=debug_params)
+                exchange_resp = requests.get(exchange_url, params=exchange_params)
 
-                if debug_resp.status_code != 200:
-                    result = {"error": debug_resp.json().get("error", "Could not debug token")}
+                if exchange_resp.status_code != 200:
+                    result = {"error": exchange_resp.json().get("error", "Could not refresh token")}
                 else:
-                    debug_data = debug_resp.json().get("data", {})
-                    expiry = debug_data.get("expires_at", "Unknown")
-                    token_type = debug_data.get("type", "Unknown")
+                    exchange_data = exchange_resp.json()
+                    new_token = exchange_data.get("access_token", token)
+
+                    # Step 3: Debug token for expiry info
+                    debug_url = f"{FB_GRAPH_URL}/debug_token"
+                    debug_params = {
+                        "input_token": new_token,
+                        "access_token": f"{APP_ID}|{APP_SECRET}"
+                    }
+                    debug_resp = requests.get(debug_url, params=debug_params)
+
+                    expiry = "Unknown"
+                    if debug_resp.status_code == 200:
+                        debug_data = debug_resp.json().get("data", {})
+                        expiry = debug_data.get("expires_at", "Unknown")
 
                     result = {
                         "id": user_data.get("id"),
                         "name": user_data.get("name"),
-                        "token_type": token_type,
-                        "new_token": token,
+                        "new_token": new_token,
                         "expiry": expiry
                     }
 
