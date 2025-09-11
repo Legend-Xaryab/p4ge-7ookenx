@@ -19,23 +19,27 @@
   <ul class="mt-2 space-y-2">
     {% for page in pages %}
       <li class="p-3 border rounded-lg bg-gray-50">
-        <strong>{{ page.name }}</strong><br>
+        <strong id="page-name-{{ loop.index }}">{{ page.name }}</strong>
+        <button type="button" 
+                onclick="copyText('page-name-{{ loop.index }}')" 
+                class="ml-2 bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600">Copy Name</button>
+        <br>
         Page ID: {{ page.id }}<br>
         Page Token: 
         <code id="token-{{ loop.index }}">{{ page.access_token }}</code>
         <button type="button" 
-                onclick="copyToken('token-{{ loop.index }}')" 
-                class="ml-2 bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">Copy</button>
+                onclick="copyText('token-{{ loop.index }}')" 
+                class="ml-2 bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">Copy Token</button>
       </li>
     {% endfor %}
   </ul>
 {% endif %}
 
 <script>
-function copyToken(id) {
+function copyText(id) {
   const text = document.getElementById(id).innerText;
   navigator.clipboard.writeText(text).then(() => {
-    alert("Copied: " + text.substring(0,30) + "...");
+    alert("Copied: " + text.substring(0, 30) + "...");
   });
 }
 </script>
