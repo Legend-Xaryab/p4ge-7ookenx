@@ -11,26 +11,10 @@ app.secret_key = os.environ.get("SECRET_KEY", "supersecret")
 FB_GRAPH_URL = "https://graph.facebook.com"
 
 # ----------------------------
-# LOGIN (No username/password needed)
-# ----------------------------
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    # Automatically log in any visitor
-    session["logged_in"] = True
-    return redirect(url_for("index"))
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
-
-# ----------------------------
-# HOME PAGE
+# HOME PAGE (direct access, no login needed)
 # ----------------------------
 @app.route("/")
 def index():
-    if "logged_in" not in session:
-        return redirect(url_for("login"))
     return render_template("index.html")
 
 # ----------------------------
@@ -38,9 +22,6 @@ def index():
 # ----------------------------
 @app.route("/send_message", methods=["POST"])
 def send_message():
-    if "logged_in" not in session:
-        return redirect(url_for("login"))
-
     page_access_token = os.environ.get("PAGE_ACCESS_TOKEN", "")
     recipient_id = request.form.get("recipient_id")
     message_text = request.form.get("message")
