@@ -16,7 +16,7 @@ FB_GRAPH_URL = "https://graph.facebook.com/v20.0"
 # -----------------------------
 @app.route("/", methods=["GET", "POST"])
 def home():
-    """Directly go to dashboard (no login)"""
+    """Directly go to dashboard (no login required)"""
     return redirect(url_for("dashboard"))
 
 
