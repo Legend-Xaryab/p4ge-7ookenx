@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect, url_for, session
+from flask import Flask, request, render_template, redirect, url_for
 import requests
 import os
 import threading
@@ -8,36 +8,106 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "supersecret")
 
 # Facebook Graph API Base URL
-FB_GRAPH_URL = "https://graph.facebook.com"
+FB_GRAPH_URL = "https://graph.facebook.com/v20.0"
 
-# ----------------------------
-# HOME PAGE (direct access, no login needed)
-# ----------------------------
-@app.route("/")
-def index():
-    return render_template("index.html")
 
-# ----------------------------
-# Example Facebook API Call
-# ----------------------------
-@app.route("/send_message", methods=["POST"])
-def send_message():
-    page_access_token = os.environ.get("PAGE_ACCESS_TOKEN", "")
-    recipient_id = request.form.get("recipient_id")
-    message_text = request.form.get("message")
+# -----------------------------
+# Routes
+# -----------------------------
+@app.route("/", methods=["GET", "POST"])
+def home():
+    """Directly go to dashboard (no login)"""
+    return redirect(url_for("dashboard"))
 
-    url = f"{FB_GRAPH_URL}/me/messages?access_token={page_access_token}"
-    payload = {
-        "recipient": {"id": recipient_id},
-        "message": {"text": message_text}
-    }
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(url, json=payload, headers=headers)
 
-    return {"status": response.status_code, "response": response.json()}
+@app.route("/dashboard")
+def dashboard():
+    """Dashboard main page"""
+    return render_template("dashboard.html")
 
-# ----------------------------
-# RUN APP
-# ----------------------------
+
+@app.route("/check", methods=["GET", "POST"])
+def check_token():
+    """Check if one or more tokens are valid"""
+    results = []
+    if request.method == "POST":
+        tokens_input = request.form.get("tokens")
+        tokens = [t.strip() for t in tokens_input.splitlines() if t.strip()]
+
+        for token in tokens:
+            url = f"{FB_GRAPH_URL}/me"
+            params = {"access_token": token}
+            response = requests.get(url, params=params)
+
+            if response.status_code == 200:
+                user = response.json()
+                results.append({
+                    "token": token,
+                    "status": "valid",
+                    "user": f"{user.get('name')} (ID: {user.get('id')})"
+                })
+            else:
+                try:
+                    err = response.json()
+                except:
+                    err = {"error": "Unknown error"}
+                results.append({
+                    "token": token,
+                    "status": "invalid",
+                    "error": err
+                })
+
+    return render_template("check.html", results=results)
+
+
+@app.route("/extract", methods=["GET", "POST"])
+def extract_pages():
+    """Extract page tokens from a user token"""
+    pages = None
+    error = None
+    if request.method == "POST":
+        user_token = request.form.get("token")
+        url = f"{FB_GRAPH_URL}/me/accounts"
+        params = {"access_token": user_token}
+        response = requests.get(url, params=params)
+
+        if response.status_code != 200:
+            error = f"Error: {response.json()}"
+        else:
+            data = response.json()
+            if "data" in data and len(data["data"]) > 0:
+                pages = [
+                    {"name": page["name"], "id": page["id"], "access_token": page["access_token"]}
+                    for page in data["data"]
+                ]
+            else:
+                error = "No pages found for this account."
+
+    return render_template("extract.html", pages=pages, error=error)
+
+
+# -----------------------------
+# Keep Alive Feature
+# -----------------------------
+def keep_alive():
+    """Prevent Render app from sleeping"""
+    while True:
+        try:
+            url = os.environ.get("RENDER_EXTERNAL_URL")
+            if url:
+                requests.get(url)
+        except Exception as e:
+            print("Keep alive error:", e)
+        time.sleep(600)  # every 10 minutes
+
+
+# Start keep_alive thread
+threading.Thread(target=keep_alive, daemon=True).start()
+
+
+# -----------------------------
+# Run App
+# -----------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
